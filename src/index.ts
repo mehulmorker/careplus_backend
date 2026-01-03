@@ -68,10 +68,30 @@ async function startServer() {
     })
   );
 
+  // CORS configuration - supports multiple origins
+  const allowedOrigins = env.CORS_ORIGIN.split(",").map((origin) =>
+    origin.trim()
+  );
+
   app.use(
     cors({
-      origin: env.CORS_ORIGIN,
+      origin: (origin, callback) => {
+        // Allow requests with no origin (mobile apps, Postman, etc.)
+        if (!origin) {
+          return callback(null, true);
+        }
+
+        // Check if origin is in allowed list
+        if (allowedOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          logger.warn("CORS blocked origin", { origin, allowedOrigins });
+          callback(new Error("Not allowed by CORS"));
+        }
+      },
       credentials: true,
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization"],
     })
   );
 

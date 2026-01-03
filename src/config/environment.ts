@@ -27,7 +27,7 @@ const envSchema = z.object({
   SENDGRID_API_KEY: z.string().optional(),
   SENDGRID_FROM_EMAIL: z.string().email().default("noreply@carepulse.com"),
 
-  // CORS
+  // CORS - Can be a single origin or comma-separated list
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
 
   // Logging
