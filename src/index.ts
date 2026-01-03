@@ -35,6 +35,7 @@ async function startServer() {
   // Create Apollo Server
   const server = new ApolloServer<Context>({
     schema,
+    csrfPrevention: false, // Disable CSRF protection for API usage
     formatError: (formattedError, error) => {
       logger.error("GraphQL Error", {
         message: formattedError.message,
@@ -113,4 +114,3 @@ startServer().catch((error) => {
   logger.error("Failed to start server", { error });
   process.exit(1);
 });
-
