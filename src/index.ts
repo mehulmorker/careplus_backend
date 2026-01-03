@@ -60,15 +60,8 @@ async function startServer() {
   // Start Apollo Server
   await server.start();
 
-  // Middleware
-  app.use(
-    helmet({
-      crossOriginEmbedderPolicy: false,
-      contentSecurityPolicy: env.NODE_ENV === "production" ? undefined : false,
-    })
-  );
-
-  // CORS configuration - supports multiple origins
+  // CORS configuration - MUST be before other middleware
+  // Supports multiple origins (comma-separated)
   const allowedOrigins = env.CORS_ORIGIN.split(",").map((origin) =>
     origin.trim()
   );
@@ -90,8 +83,26 @@ async function startServer() {
         }
       },
       credentials: true,
-      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "Authorization"],
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+      allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Accept",
+        "Origin",
+      ],
+      exposedHeaders: ["Content-Type", "Authorization"],
+      preflightContinue: false,
+      optionsSuccessStatus: 204,
+    })
+  );
+
+  // Middleware - CORS must be before helmet
+  app.use(
+    helmet({
+      crossOriginEmbedderPolicy: false,
+      contentSecurityPolicy: env.NODE_ENV === "production" ? undefined : false,
+      crossOriginResourcePolicy: { policy: "cross-origin" },
     })
   );
 
@@ -100,6 +111,11 @@ async function startServer() {
   // Health check endpoint
   app.get("/health", (_req: express.Request, res: express.Response): void => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  // Handle OPTIONS preflight requests for GraphQL
+  app.options("/graphql", (_req: express.Request, res: express.Response) => {
+    res.sendStatus(204);
   });
 
   // GraphQL endpoint
