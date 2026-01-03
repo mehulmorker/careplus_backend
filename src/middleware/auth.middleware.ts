@@ -159,7 +159,8 @@ export const authMiddleware = (
     res: Response,
     next: NextFunction
   ) => {
-    const token = extractTokenFromHeader(req.headers.authorization);
+    const authHeader = (req as Request).headers.authorization;
+    const token = extractTokenFromHeader(authHeader);
 
     if (!token) {
       return next();

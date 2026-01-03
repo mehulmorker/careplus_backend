@@ -77,14 +77,13 @@ async function startServer() {
   app.use(express.json());
 
   // Health check endpoint
-  app.get("/health", (_, res) => {
+  app.get("/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
   // GraphQL endpoint
   app.use(
     "/graphql",
-    // @ts-expect-error - Express types conflict between Apollo and local Express
     expressMiddleware(server, {
       context: async ({ req, res }) => createContext({ req, res }),
     })
