@@ -76,11 +76,19 @@ async function startServer() {
 
         // Check if origin is in allowed list
         if (allowedOrigins.includes(origin)) {
-          callback(null, true);
-        } else {
-          logger.warn("CORS blocked origin", { origin, allowedOrigins });
-          callback(new Error("Not allowed by CORS"));
+          return callback(null, true);
         }
+
+        // Allow all Vercel preview deployments (pattern: *.vercel.app)
+        const vercelPattern = /^https:\/\/.*\.vercel\.app$/;
+        if (vercelPattern.test(origin)) {
+          logger.info("CORS allowed Vercel origin", { origin });
+          return callback(null, true);
+        }
+
+        // Block if not in allowed list and not Vercel
+        logger.warn("CORS blocked origin", { origin, allowedOrigins });
+        callback(new Error("Not allowed by CORS"));
       },
       credentials: true,
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
