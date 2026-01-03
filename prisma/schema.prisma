@@ -1,0 +1,135 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ Enums ============
+
+enum UserRole {
+  PATIENT
+  ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum AppointmentStatus {
+  PENDING
+  SCHEDULED
+  CANCELLED
+}
+
+// ============ Models ============
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  phone     String   @unique
+  password  String?   // Optional - guest users don't have passwords
+  role      UserRole @default(PATIENT)
+
+  // Relations
+  patient Patient?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Patient {
+  id String @id @default(cuid())
+
+  // User relation
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Personal info
+  birthDate  DateTime
+  gender     Gender
+  address    String
+  occupation String
+
+  // Emergency contact
+  emergencyContactName   String
+  emergencyContactNumber String
+
+  // Medical info
+  primaryPhysician     String
+  insuranceProvider    String
+  insurancePolicyNumber String
+  allergies            String?
+  currentMedication    String?
+  familyMedicalHistory String?
+  pastMedicalHistory   String?
+
+  // Identification
+  identificationType        String?
+  identificationNumber      String?
+  identificationDocumentId  String?
+  identificationDocumentUrl String?
+
+  // Consent
+  privacyConsent    Boolean @default(false)
+  treatmentConsent  Boolean @default(false)
+  disclosureConsent Boolean @default(false)
+
+  // Relations
+  appointments Appointment[]
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("patients")
+}
+
+model Appointment {
+  id String @id @default(cuid())
+
+  // Patient relation
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  // Appointment details
+  primaryPhysician   String
+  schedule           DateTime
+  status             AppointmentStatus @default(PENDING)
+  reason             String
+  note               String?
+  cancellationReason String?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([status])
+  @@index([schedule])
+  @@map("appointments")
+}
+
+model Doctor {
+  id        String  @id @default(cuid())
+  name      String
+  image     String
+  specialty String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("doctors")
+}
+
