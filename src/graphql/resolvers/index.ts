@@ -85,6 +85,9 @@ export const resolvers = {
     // Appointment mutations
     ...appointmentResolvers.Mutation,
 
+    // Admin mutations
+    ...adminResolvers.Mutation,
+
     // Cloudinary mutations
     ...cloudinaryResolvers.Mutation,
   },

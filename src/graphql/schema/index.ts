@@ -51,6 +51,14 @@ const userSchema = gql`
     password: String!
   }
 
+  input CreateAdminInput {
+    email: String!
+    name: String!
+    phone: String!
+    password: String!
+    secretKey: String!
+  }
+
   input CreateGuestUserInput {
     email: String!
     name: String!
@@ -304,6 +312,9 @@ const rootSchema = gql`
     ): AppointmentPayload!
     cancelAppointment(id: ID!, reason: String!): AppointmentPayload!
     scheduleAppointment(id: ID!, schedule: DateTime!): AppointmentPayload!
+
+    # Admin
+    createAdmin(input: CreateAdminInput!): AuthPayload!
 
     # File Upload
     uploadImage(input: UploadImageInput!): ImageUploadPayload!

@@ -37,6 +37,9 @@ const envSchema = z.object({
   CLOUDINARY_CLOUD_NAME: z.string().optional(),
   CLOUDINARY_API_KEY: z.string().optional(),
   CLOUDINARY_API_SECRET: z.string().optional(),
+
+  // Admin
+  ADMIN_SECRET_KEY: z.string().min(16, "Admin secret key must be at least 16 characters"),
 });
 
 // Parse and validate

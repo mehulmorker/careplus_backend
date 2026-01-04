@@ -145,7 +145,7 @@ export const createContext = async ({
     patientRepository,
     emailService
   );
-  const adminService = createAdminService(appointmentRepository);
+  const adminService = createAdminService(appointmentRepository, userRepository);
 
   // Create authentication context
   const auth = await createAuthContext(req, authService, userRepository);
