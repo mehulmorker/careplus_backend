@@ -58,9 +58,6 @@ async function startServer() {
     },
   });
 
-  console.log("ENV", JSON.stringify(process.env));
-
-  // Start Apollo Server
   await server.start();
 
   // CORS configuration - MUST be before other middleware
