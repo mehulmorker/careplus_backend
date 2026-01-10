@@ -11,16 +11,19 @@ export const COOKIE_NAMES = {
 
 /**
  * Cookie options for secure HTTP-only cookies
+ * Supports cross-domain in production (frontend and backend on different domains)
  */
 const getCookieOptions = (maxAge: number) => {
   const isProduction = env.NODE_ENV === "production";
 
   return {
     httpOnly: true, // Prevents JavaScript access (XSS protection)
-    secure: isProduction, // Only send over HTTPS in production
-    sameSite: "lax" as const, // CSRF protection
+    secure: isProduction, // Only send over HTTPS in production (required for sameSite: "none")
+    sameSite: isProduction ? ("none" as const) : ("lax" as const), // "none" for cross-domain, "lax" for same-domain
     path: "/", // Available across entire site
     maxAge, // Expiration in seconds
+    // Note: domain is NOT set - let browser handle it automatically
+    // Setting domain explicitly can cause issues with subdomains
   };
 };
 
@@ -56,10 +59,11 @@ export const setRefreshTokenCookie = (res: Response, token: string): void => {
  * @param res - Express response object
  */
 export const clearAccessTokenCookie = (res: Response): void => {
+  const isProduction = env.NODE_ENV === "production";
   res.clearCookie(COOKIE_NAMES.ACCESS_TOKEN, {
     httpOnly: true,
-    secure: env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: isProduction,
+    sameSite: isProduction ? ("none" as const) : ("lax" as const),
     path: "/",
   });
 };
@@ -70,10 +74,11 @@ export const clearAccessTokenCookie = (res: Response): void => {
  * @param res - Express response object
  */
 export const clearRefreshTokenCookie = (res: Response): void => {
+  const isProduction = env.NODE_ENV === "production";
   res.clearCookie(COOKIE_NAMES.REFRESH_TOKEN, {
     httpOnly: true,
-    secure: env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: isProduction,
+    sameSite: isProduction ? ("none" as const) : ("lax" as const),
     path: "/",
   });
 };
