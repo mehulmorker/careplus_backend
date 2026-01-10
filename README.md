@@ -2,10 +2,14 @@
 
 Express.js + GraphQL backend server for the CarePulse Healthcare Management System.
 
+> **Note:** This repository contains the **backend** of the CarePulse application. The frontend is a separate repository. See the [Frontend Repository](#frontend-repository) section below.
+
 ## 📋 Table of Contents
 
+- [Frontend Repository](#frontend-repository)
 - [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
+- [Getting Started](#getting-started)
+- [Cloning and Setup](#cloning-and-setup)
 - [Available Scripts](#available-scripts)
 - [Project Structure](#project-structure)
 - [Database Setup](#database-setup)
@@ -17,38 +21,180 @@ Express.js + GraphQL backend server for the CarePulse Healthcare Management Syst
 
 ---
 
-## Prerequisites
+## Frontend Repository
 
-- **Node.js:** 18.0 or higher
-- **npm:** 9.0 or higher
-- **PostgreSQL:** 14.0 or higher
-- **Database:** A running PostgreSQL instance
+The frontend is a separate Next.js application. You can find it here:
+
+- **Frontend Repo:** [https://github.com/mehulmorker/careplus_frontend](https://github.com/mehulmorker/careplus_frontend)
+
+### Full Stack Setup
+
+To run the complete CarePulse application, you need both repositories:
+
+1. **Backend** (this repository) - GraphQL API server
+2. **Frontend** - Next.js web application
+
+See the [Cloning and Setup](#cloning-and-setup) section for step-by-step instructions on setting up both.
 
 ---
 
-## Quick Start
+## Prerequisites
 
-### 1. Install Dependencies
+Before you begin, ensure you have the following installed:
+
+- **Node.js:** 18.0 or higher ([Download](https://nodejs.org/))
+- **npm:** 9.0 or higher (comes with Node.js)
+- **PostgreSQL:** 14.0 or higher ([Download](https://www.postgresql.org/download/))
+- **Git:** For cloning the repository
+
+### Database Options
+
+You can use either:
+- **Local PostgreSQL** installation
+- **Neon DB** (cloud PostgreSQL) - Recommended for easier setup
+
+---
+
+## Getting Started
+
+### Quick Start
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/mehulmorker/careplus_backend
+   cd careplus_backend
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Configure environment**
+   ```bash
+   # Copy example environment file
+   cp .env.example .env
+   
+   # Edit with your settings
+   nano .env
+   ```
+
+4. **Setup database**
+   ```bash
+   # Run migrations
+   npx prisma migrate dev --name init
+   
+   # Generate Prisma Client
+   npx prisma generate
+   ```
+
+5. **Start development server**
+   ```bash
+   npm run dev
+   ```
+
+6. **Access GraphQL Playground**
+   - Visit [http://localhost:4000/graphql](http://localhost:4000/graphql)
+
+---
+
+## Cloning and Setup
+
+### Step-by-Step Setup Guide
+
+This guide will help you set up both the backend and frontend repositories.
+
+#### 1. Clone Both Repositories
 
 ```bash
+# Clone backend repository
+git clone https://github.com/mehulmorker/careplus_backend
+cd careplus_backend
+
+# Clone frontend repository (in a separate directory)
+cd ..
+git clone https://github.com/mehulmorker/careplus_frontend
+```
+
+Your directory structure should look like:
+```
+careplus/
+├── careplus_backend/    # Backend (this repo)
+└── careplus_frontend/   # Frontend
+```
+
+#### 2. Setup Backend
+
+```bash
+cd careplus_backend
+
+# Install dependencies
 npm install
-```
 
-### 2. Configure Environment
-
-```bash
-# Copy example environment file
+# Create environment file
 cp .env.example .env
-
-# Edit with your database credentials
-nano .env
 ```
 
-### 3. Setup Database
+#### 3. Configure Backend Environment
+
+Edit the `.env` file with your configuration:
+
+```env
+# .env
+NODE_ENV=development
+PORT=4000
+
+# Database - Use Neon DB or local PostgreSQL
+# For Neon DB (recommended):
+DATABASE_URL="postgresql://user:password@ep-xxx-xxx.region.aws.neon.tech/dbname?sslmode=require"
+
+# For local PostgreSQL:
+# DATABASE_URL="postgresql://postgres:password@localhost:5432/carepulse_dev"
+
+# JWT Secrets (generate strong random strings)
+JWT_SECRET="your-super-secret-jwt-key-at-least-32-characters-long"
+JWT_EXPIRES_IN="15m"
+JWT_REFRESH_SECRET="your-super-secret-refresh-key-at-least-32-characters-long"
+JWT_REFRESH_EXPIRES_IN="7d"
+
+# CORS - Frontend URL
+CORS_ORIGIN="http://localhost:3000"
+
+# Email (SendGrid) - Optional for development
+SENDGRID_API_KEY="your-sendgrid-api-key"
+FROM_EMAIL="noreply@careplus.com"
+
+# Cloudinary (for file uploads) - Optional for development
+CLOUDINARY_CLOUD_NAME="your-cloud-name"
+CLOUDINARY_API_KEY="your-api-key"
+CLOUDINARY_API_SECRET="your-api-secret"
+```
+
+#### 4. Setup Database
+
+**Option A: Using Neon DB (Recommended)**
+
+1. Sign up at [Neon](https://neon.tech/)
+2. Create a new project
+3. Copy the connection string
+4. Paste it into your `.env` file as `DATABASE_URL`
+
+**Option B: Using Local PostgreSQL**
 
 ```bash
-# Create database (in psql)
+# Create database
 psql -U postgres -c "CREATE DATABASE carepulse_dev;"
+
+# Or using psql
+sudo -u postgres psql
+CREATE DATABASE carepulse_dev;
+\q
+```
+
+#### 5. Run Database Migrations
+
+```bash
+cd careplus_backend
 
 # Run migrations
 npx prisma migrate dev --name init
@@ -56,19 +202,63 @@ npx prisma migrate dev --name init
 # Generate Prisma Client
 npx prisma generate
 
-# Seed with sample data (optional)
+# (Optional) Seed with sample data
 npm run prisma:seed
 ```
 
-### 4. Start Development Server
+#### 6. Start Backend Server
 
 ```bash
+cd careplus_backend
 npm run dev
 ```
 
-### 5. Access GraphQL Playground
+The backend should start on `http://localhost:4000`
 
-Visit [http://localhost:4000/graphql](http://localhost:4000/graphql)
+Verify it's working:
+```bash
+curl http://localhost:4000/graphql?query=%7B__typename%7D
+# Should return: {"data":{"__typename":"Query"}}
+```
+
+#### 7. Setup Frontend
+
+Open a new terminal window:
+
+```bash
+cd careplus_frontend
+
+# Install dependencies
+npm install
+
+# Create environment file
+cp .env.example .env.local
+```
+
+#### 8. Configure Frontend Environment
+
+Edit `frontend/.env.local`:
+
+```env
+# .env.local
+NEXT_PUBLIC_API_URL=http://localhost:4000/graphql
+```
+
+#### 9. Start Frontend Server
+
+```bash
+cd careplus_frontend
+npm run dev
+```
+
+The frontend should start on `http://localhost:3000`
+
+#### 10. Verify Complete Setup
+
+1. Open [http://localhost:3000](http://localhost:3000) in your browser
+2. You should see the CarePulse homepage
+3. Try registering a new patient to verify the connection
+4. Check backend terminal for GraphQL requests
 
 ---
 
@@ -133,13 +323,19 @@ backend/
 │   ├── config/               # Configuration
 │   │   ├── index.ts         # Config exports
 │   │   ├── environment.ts   # Environment variables
-│   │   └── database.ts      # Prisma client
+│   │   ├── database.ts     # Prisma client
+│   │   ├── email.ts         # SendGrid email service
+│   │   └── cloudinary.ts    # Cloudinary file upload
 │   │
 │   ├── graphql/              # GraphQL layer
 │   │   ├── schema/          # Type definitions
 │   │   │   └── index.ts
 │   │   ├── resolvers/       # Query/Mutation handlers
-│   │   │   └── index.ts
+│   │   │   ├── index.ts
+│   │   │   ├── auth.resolver.ts
+│   │   │   ├── user.resolver.ts
+│   │   │   ├── patient.resolver.ts
+│   │   │   └── appointment.resolver.ts
 │   │   └── context.ts       # Request context
 │   │
 │   ├── services/             # Business logic
@@ -147,11 +343,14 @@ backend/
 │   │   ├── auth.service.ts
 │   │   ├── patient.service.ts
 │   │   ├── appointment.service.ts
+│   │   ├── admin.service.ts
+│   │   ├── token-blacklist.service.ts
 │   │   └── __tests__/       # Service tests
 │   │
 │   ├── repositories/         # Data access layer
 │   │   ├── base.repository.ts
 │   │   ├── user.repository.ts
+│   │   ├── patient.repository.ts
 │   │   └── __tests__/       # Repository tests
 │   │
 │   ├── middleware/           # Express middleware
@@ -159,7 +358,9 @@ backend/
 │   │
 │   ├── utils/                # Utility functions
 │   │   ├── errors.ts        # Custom error classes
-│   │   └── logger.ts        # Logging utility
+│   │   ├── logger.ts        # Logging utility
+│   │   ├── cookies.ts       # Cookie utilities
+│   │   └── email-verification.ts
 │   │
 │   └── __tests__/            # Integration tests
 │       └── integration/
@@ -179,23 +380,43 @@ backend/
 
 ## Database Setup
 
-### PostgreSQL Installation
+### Using Neon DB (Recommended)
+
+1. **Sign up** at [https://neon.tech/](https://neon.tech/)
+2. **Create a new project**
+3. **Copy the connection string** from the dashboard
+4. **Add to `.env` file:**
+   ```env
+   DATABASE_URL="postgresql://user:password@ep-xxx-xxx.region.aws.neon.tech/dbname?sslmode=require"
+   ```
+5. **Run migrations:**
+   ```bash
+   npx prisma migrate dev --name init
+   ```
+
+### Using Local PostgreSQL
+
+#### Installation
 
 ```bash
 # Ubuntu/Debian
 sudo apt update
 sudo apt install postgresql postgresql-contrib
 
-# Start PostgreSQL service
-sudo systemctl start postgresql
-sudo systemctl enable postgresql
+# macOS (using Homebrew)
+brew install postgresql
+brew services start postgresql
+
+# Windows
+# Download from https://www.postgresql.org/download/windows/
 ```
 
-### Create Databases
+#### Create Databases
 
 ```bash
 # Access PostgreSQL
-sudo -u postgres psql
+sudo -u postgres psql  # Linux
+psql -U postgres        # macOS/Windows
 
 # Create development database
 CREATE DATABASE carepulse_dev;
@@ -218,8 +439,11 @@ GRANT ALL PRIVILEGES ON DATABASE carepulse_test TO carepulse_user;
 postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public
 
 # Examples:
+# Local:
 postgresql://postgres:password@localhost:5432/carepulse_dev
-postgresql://carepulse_user:your_password@localhost:5432/carepulse_dev
+
+# Neon DB:
+postgresql://user:password@ep-xxx-xxx.region.aws.neon.tech/dbname?sslmode=require
 ```
 
 ### Prisma Commands
@@ -237,7 +461,7 @@ npx prisma studio
 # Reset database (DELETES ALL DATA)
 npx prisma migrate reset --force
 
-# Push schema without creating migration
+# Push schema without creating migration (dev only)
 npx prisma db push
 ```
 
@@ -448,11 +672,29 @@ With the server running, visit: [http://localhost:4000/graphql](http://localhost
   __typename
 }
 
-# Health check (after implementation)
+# Get current user
 query {
-  health {
-    status
-    timestamp
+  me {
+    id
+    email
+    name
+    role
+  }
+}
+
+# Get all appointments (admin only)
+query {
+  appointments {
+    appointments {
+      id
+      schedule
+      reason
+      status
+      patient {
+        name
+        email
+      }
+    }
   }
 }
 ```
@@ -460,7 +702,7 @@ query {
 ### Example Mutations
 
 ```graphql
-# Register user (Phase 2+)
+# Register user
 mutation {
   register(input: {
     email: "patient@example.com"
@@ -479,13 +721,29 @@ mutation {
   }
 }
 
-# Login (Phase 2+)
+# Login
 mutation {
   login(email: "patient@example.com", password: "password123") {
-    token
     user {
       id
       email
+      role
+    }
+    errors {
+      message
+    }
+  }
+}
+
+# Refresh token
+mutation {
+  refreshToken {
+    user {
+      id
+      email
+    }
+    errors {
+      message
     }
   }
 }
@@ -499,10 +757,10 @@ curl -X POST http://localhost:4000/graphql \
   -H "Content-Type: application/json" \
   -d '{"query": "{ __typename }"}'
 
-# With authentication
+# With cookies (after login)
 curl -X POST http://localhost:4000/graphql \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Cookie: accessToken=YOUR_TOKEN" \
   -d '{"query": "{ me { id email } }"}'
 ```
 
@@ -512,6 +770,8 @@ curl -X POST http://localhost:4000/graphql \
 
 ### Required Variables
 
+Create a `.env` file in the root directory:
+
 ```env
 # .env
 NODE_ENV=development
@@ -520,9 +780,14 @@ PORT=4000
 # Database
 DATABASE_URL="postgresql://postgres:password@localhost:5432/carepulse_dev"
 
-# JWT
+# JWT Secrets (generate strong random strings, at least 32 characters)
 JWT_SECRET="your-super-secret-jwt-key-at-least-32-characters-long"
-JWT_EXPIRES_IN="7d"
+JWT_EXPIRES_IN="15m"
+JWT_REFRESH_SECRET="your-super-secret-refresh-key-at-least-32-characters-long"
+JWT_REFRESH_EXPIRES_IN="7d"
+
+# CORS - Frontend URL
+CORS_ORIGIN="http://localhost:3000"
 ```
 
 ### All Variables
@@ -533,9 +798,15 @@ JWT_EXPIRES_IN="7d"
 | `PORT` | No | 4000 | Server port |
 | `DATABASE_URL` | Yes | - | PostgreSQL connection string |
 | `JWT_SECRET` | Yes | - | JWT signing secret (32+ chars) |
-| `JWT_EXPIRES_IN` | No | 7d | JWT expiration time |
-| `SENDGRID_API_KEY` | Phase 6 | - | SendGrid API key |
-| `FROM_EMAIL` | Phase 6 | - | Email sender address |
+| `JWT_EXPIRES_IN` | No | 15m | Access token expiration |
+| `JWT_REFRESH_SECRET` | Yes | - | Refresh token secret (32+ chars) |
+| `JWT_REFRESH_EXPIRES_IN` | No | 7d | Refresh token expiration |
+| `CORS_ORIGIN` | Yes | - | Frontend URL for CORS |
+| `SENDGRID_API_KEY` | No | - | SendGrid API key for emails |
+| `FROM_EMAIL` | No | - | Email sender address |
+| `CLOUDINARY_CLOUD_NAME` | No | - | Cloudinary cloud name |
+| `CLOUDINARY_API_KEY` | No | - | Cloudinary API key |
+| `CLOUDINARY_API_SECRET` | No | - | Cloudinary API secret |
 
 ### Test Environment
 
@@ -544,6 +815,21 @@ JWT_EXPIRES_IN="7d"
 NODE_ENV=test
 DATABASE_URL="postgresql://postgres:password@localhost:5432/carepulse_test"
 JWT_SECRET="test-secret-key-for-testing-only"
+JWT_REFRESH_SECRET="test-refresh-secret-key-for-testing-only"
+CORS_ORIGIN="http://localhost:3000"
+```
+
+### Environment File Setup
+
+```bash
+# Copy example file (if exists)
+cp .env.example .env
+
+# Or create manually
+touch .env
+
+# Edit with your configuration
+nano .env
 ```
 
 ---
@@ -559,15 +845,30 @@ JWT_SECRET="test-secret-key-for-testing-only"
 npm run dev:port  # Uses port 4001
 
 # Option 2: Kill process on port 4000
+# On Linux/Mac:
 lsof -ti:4000 | xargs kill -9
+
+# On Windows:
+netstat -ano | findstr :4000
+taskkill /PID <PID> /F
+
+# Then restart
 npm run dev
 ```
 
 #### 2. Database Connection Error
 
+**Symptoms:** "Can't reach database server" or Prisma connection errors
+
+**Solutions:**
+
 ```bash
 # Check PostgreSQL is running
+# Linux:
 sudo systemctl status postgresql
+
+# macOS:
+brew services list | grep postgresql
 
 # Check connection
 psql -U postgres -c "SELECT 1"
@@ -577,16 +878,21 @@ echo $DATABASE_URL
 
 # Test with Prisma
 npx prisma db pull
+
+# For Neon DB: Verify connection string includes ?sslmode=require
 ```
 
 #### 3. Prisma Migration Error
 
 ```bash
-# Reset database and migrations
+# Reset database and migrations (CAUTION: Deletes all data)
 npx prisma migrate reset --force
 
-# Or push schema directly (dev only)
+# Or push schema directly (dev only, no migration history)
 npx prisma db push
+
+# Check migration status
+npx prisma migrate status
 ```
 
 #### 4. TypeScript Errors
@@ -597,6 +903,9 @@ npm run type-check
 
 # Regenerate Prisma types
 npx prisma generate
+
+# Clear TypeScript cache
+rm -rf tsconfig.tsbuildinfo
 ```
 
 #### 5. Module Not Found
@@ -610,6 +919,43 @@ npm install
 npx prisma generate
 ```
 
+#### 6. CORS Errors
+
+**Symptoms:** Frontend can't connect to backend
+
+**Solutions:**
+
+1. **Check CORS_ORIGIN in `.env`:**
+   ```env
+   CORS_ORIGIN="http://localhost:3000"
+   ```
+
+2. **For multiple origins (production):**
+   ```env
+   CORS_ORIGIN="http://localhost:3000,https://your-frontend.vercel.app"
+   ```
+
+3. **Restart backend after changing CORS_ORIGIN**
+
+#### 7. JWT Token Errors
+
+**Symptoms:** "Invalid token" or authentication failures
+
+**Solutions:**
+
+1. **Verify JWT secrets are set:**
+   ```bash
+   # Check .env file
+   grep JWT_SECRET .env
+   ```
+
+2. **Ensure secrets are at least 32 characters:**
+   ```env
+   JWT_SECRET="your-super-secret-jwt-key-at-least-32-characters-long"
+   ```
+
+3. **Clear browser cookies and try again**
+
 ### Health Check Commands
 
 ```bash
@@ -620,6 +966,12 @@ npm run health
 curl http://localhost:4000/graphql?query=%7B__typename%7D
 
 # Expected: {"data":{"__typename":"Query"}}
+
+# Check database connection
+npx prisma studio  # Should open without errors
+
+# Full verification
+npm run verify
 ```
 
 ### Full Verification
@@ -670,9 +1022,19 @@ npx prisma validate
 npx prisma migrate status
 ```
 
+### Verify Frontend Connection
+
+1. Start backend: `npm run dev` (should be on port 4000)
+2. Start frontend: `cd ../careplus_frontend && npm run dev` (should be on port 3000)
+3. Open browser: [http://localhost:3000](http://localhost:3000)
+4. Try registering a patient
+5. Check backend terminal for GraphQL requests
+
 ---
 
 ## Learn More
+
+### Documentation
 
 - [Express.js Documentation](https://expressjs.com/)
 - [Apollo Server Documentation](https://www.apollographql.com/docs/apollo-server/)
@@ -680,7 +1042,28 @@ npx prisma migrate status
 - [GraphQL Documentation](https://graphql.org/learn/)
 - [Vitest Documentation](https://vitest.dev/)
 
+### Related Resources
+
+- [Frontend Repository](https://github.com/mehulmorker/careplus_frontend)
+- [Neon Database Guide](https://neon.tech/docs/)
+- [SendGrid Documentation](https://docs.sendgrid.com/)
+
+---
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
+
+## License
+
+This project is part of the CarePulse Healthcare Management System.
+
 ---
 
 **Part of the CarePulse Healthcare Management System**
-
