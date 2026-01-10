@@ -1,17 +1,9 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import { User } from "@prisma/client";
-import { AuthService, TokenPayload } from "../services/auth.service";
+import { AuthService } from "../services/auth.service";
 import { IUserRepository } from "../repositories/user.repository";
 import { AuthenticationError, AuthorizationError } from "../utils/errors";
 import { logger } from "../utils/logger";
-
-/**
- * Extended Express Request with authenticated user
- */
-export interface AuthenticatedRequest extends Request {
-  user?: User;
-  token?: string;
-}
 
 /**
  * Authentication Context for GraphQL
@@ -25,89 +17,107 @@ export interface AuthContext {
 }
 
 /**
- * Extract JWT token from Authorization header
+ * Extract access token from cookies
  *
- * Expected format: "Bearer <token>"
- *
- * @param authHeader - Authorization header value
- * @returns Token string or null
+ * @param cookies - Request cookies object
+ * @returns Access token string or null
  */
-export const extractTokenFromHeader = (authHeader?: string): string | null => {
-  if (!authHeader) {
-    return null;
+export const extractTokenFromCookies = (cookies?: {
+  accessToken?: string;
+  refreshToken?: string;
+}): { accessToken: string | null; refreshToken: string | null } => {
+  if (!cookies) {
+    return { accessToken: null, refreshToken: null };
   }
 
-  const parts = authHeader.split(" ");
-
-  if (parts.length !== 2 || parts[0].toLowerCase() !== "bearer") {
-    return null;
-  }
-
-  return parts[1];
+  return {
+    accessToken: cookies.accessToken || null,
+    refreshToken: cookies.refreshToken || null,
+  };
 };
 
 /**
  * Create authentication context for GraphQL requests
  *
  * This is called for every GraphQL request to:
- * 1. Extract token from headers
- * 2. Validate token
- * 3. Fetch user from database
- * 4. Return auth context
+ * 1. Extract access token from cookies
+ * 2. Validate access token
+ * 3. If access token invalid/expired, try refresh token
+ * 4. Fetch user from database
+ * 5. Return auth context
  *
  * Note: Does NOT throw errors - returns null user for unauthenticated requests.
  * Individual resolvers decide if authentication is required.
  *
  * @param req - Express request object
+ * @param res - Express response object (for setting new access token if refreshed)
  * @param authService - Auth service instance
  * @param userRepository - User repository instance
  * @returns AuthContext with user info
  */
 export const createAuthContext = async (
   req: Request,
+  res: Response,
   authService: AuthService,
   userRepository: IUserRepository
 ): Promise<AuthContext> => {
-  const token = extractTokenFromHeader(req.headers.authorization);
+  const { accessToken, refreshToken } = extractTokenFromCookies(req.cookies);
 
-  if (!token) {
-    return {
-      user: null,
-      token: null,
-      isAuthenticated: false,
-    };
-  }
+  // Try to validate access token first
+  if (accessToken) {
+    try {
+      const payload = await authService.validateToken(accessToken);
+      const user = await userRepository.findById(payload.userId);
 
-  try {
-    // Validate token and get payload
-    const payload = await authService.validateToken(token);
-
-    // Fetch user from database
-    const user = await userRepository.findById(payload.userId);
-
-    if (!user) {
-      logger.warn("Token valid but user not found", { userId: payload.userId });
-      return {
-        user: null,
-        token: null,
-        isAuthenticated: false,
-      };
+      if (user) {
+        return {
+          user,
+          token: accessToken,
+          isAuthenticated: true,
+        };
+      }
+    } catch (error) {
+      // Access token invalid/expired - try refresh token
+      logger.debug("Access token validation failed, trying refresh token", {
+        error,
+      });
     }
-
-    return {
-      user,
-      token,
-      isAuthenticated: true,
-    };
-  } catch (error) {
-    // Token validation failed - return unauthenticated context
-    logger.debug("Token validation failed", { error });
-    return {
-      user: null,
-      token: null,
-      isAuthenticated: false,
-    };
   }
+
+  // If access token missing or invalid, try refresh token
+  if (refreshToken) {
+    try {
+      const payload = await authService.validateRefreshToken(refreshToken);
+      const user = await userRepository.findById(payload.userId);
+
+      if (user) {
+        // Generate new access token and set cookie
+        const newAccessToken = authService.generateAccessToken(user);
+        
+        // Set new access token cookie
+        const { setAccessTokenCookie } = await import("../utils/cookies");
+        setAccessTokenCookie(res, newAccessToken);
+
+        logger.debug("Access token refreshed", { userId: user.id });
+
+        return {
+          user,
+          token: newAccessToken,
+          isAuthenticated: true,
+        };
+      }
+    } catch (error) {
+      // Refresh token also invalid
+      logger.debug("Refresh token validation failed", { error });
+    }
+  }
+
+  // No valid tokens
+  return {
+    user: null,
+    token: null,
+    isAuthenticated: false,
+  };
 };
 
 /**
@@ -144,42 +154,4 @@ export const requireAdmin = (context: { auth: AuthContext }): User => {
   return user;
 };
 
-/**
- * Express Middleware for Authentication
- *
- * Use for REST endpoints (if any).
- * For GraphQL, use createAuthContext instead.
- */
-export const authMiddleware = (
-  authService: AuthService,
-  userRepository: IUserRepository
-) => {
-  return async (
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ) => {
-    const authHeader = (req as Request).headers.authorization;
-    const token = extractTokenFromHeader(authHeader);
-
-    if (!token) {
-      return next();
-    }
-
-    try {
-      const payload = await authService.validateToken(token);
-      const user = await userRepository.findById(payload.userId);
-
-      if (user) {
-        req.user = user;
-        req.token = token;
-      }
-
-      next();
-    } catch (error) {
-      // Continue without authentication - let route handlers decide
-      next();
-    }
-  };
-};
 

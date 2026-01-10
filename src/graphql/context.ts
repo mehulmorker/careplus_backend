@@ -22,6 +22,7 @@ import {
   EmailService,
   GuestService,
   CloudinaryService,
+  TokenBlacklistService,
   createUserService,
   createAuthService,
   createPatientService,
@@ -30,6 +31,7 @@ import {
   createEmailService,
   createGuestService,
   createCloudinaryService,
+  createTokenBlacklistService,
 } from "../services";
 import { AuthContext, createAuthContext } from "../middleware/auth.middleware";
 
@@ -89,6 +91,7 @@ export interface Context {
     email: EmailService;
     guest: GuestService;
     cloudinary: CloudinaryService;
+    tokenBlacklist: TokenBlacklistService;
   };
 }
 
@@ -126,9 +129,12 @@ export const createContext = async ({
   const patientRepository = createPatientRepository(prisma);
   const appointmentRepository = createAppointmentRepository(prisma);
 
+  // Create token blacklist service (singleton)
+  const tokenBlacklist = createTokenBlacklistService();
+
   // Create services (with dependency injection)
   const userService = createUserService(userRepository);
-  const authService = createAuthService(userRepository, userService);
+  const authService = createAuthService(userRepository, userService, tokenBlacklist);
   const patientService = createPatientService(
     patientRepository,
     userRepository
@@ -147,8 +153,8 @@ export const createContext = async ({
   );
   const adminService = createAdminService(appointmentRepository, userRepository);
 
-  // Create authentication context
-  const auth = await createAuthContext(req, authService, userRepository);
+  // Create authentication context (reads from cookies)
+  const auth = await createAuthContext(req, res, authService, userRepository);
 
   return {
     req,
@@ -169,6 +175,7 @@ export const createContext = async ({
       email: emailService,
       guest: guestService,
       cloudinary: cloudinaryService,
+      tokenBlacklist,
     },
   };
 };

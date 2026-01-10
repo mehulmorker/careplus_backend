@@ -2,6 +2,12 @@ import { User } from "@prisma/client";
 import { Context } from "../context";
 import { requireAuth } from "../../middleware/auth.middleware";
 import { logger } from "../../utils/logger";
+import {
+  setAccessTokenCookie,
+  setRefreshTokenCookie,
+  clearAuthCookies,
+} from "../../utils/cookies";
+import { TokenBlacklistService } from "../../services/token-blacklist.service";
 
 /**
  * Auth Resolver Types
@@ -59,10 +65,10 @@ export const authResolvers = {
      * Register a new user
      *
      * Creates a new user account with the provided information.
-     * Returns authentication token on success.
+     * Sets HTTP-only cookies with access and refresh tokens on success.
      *
      * @param input - Registration data (email, name, phone, password)
-     * @returns AuthPayload with token, user, and errors
+     * @returns AuthPayload with user and errors (no token - set in cookies)
      */
     register: async (
       _parent: unknown,
@@ -74,9 +80,21 @@ export const authResolvers = {
       // Delegate to auth service
       const result = await context.services.auth.register(input);
 
+      // If registration successful, set authentication cookies
+      if (result.success && result.user) {
+        const accessToken = context.services.auth.generateAccessToken(result.user);
+        const refreshToken = context.services.auth.generateRefreshToken(result.user);
+
+        setAccessTokenCookie(context.res, accessToken);
+        setRefreshTokenCookie(context.res, refreshToken);
+
+        logger.info("User registered and authenticated", {
+          userId: result.user.id,
+        });
+      }
+
       return {
         success: result.success,
-        token: result.token || null,
         user: result.user || null,
         errors: result.errors,
       };
@@ -85,10 +103,10 @@ export const authResolvers = {
     /**
      * Login with email and password
      *
-     * Authenticates user and returns JWT token.
+     * Authenticates user and sets HTTP-only cookies with access and refresh tokens.
      *
      * @param input - Login credentials (email, password)
-     * @returns AuthPayload with token, user, and errors
+     * @returns AuthPayload with user and errors (no token - set in cookies)
      */
     login: async (
       _parent: unknown,
@@ -100,9 +118,21 @@ export const authResolvers = {
       // Delegate to auth service
       const result = await context.services.auth.login(input);
 
+      // If login successful, set authentication cookies
+      if (result.success && result.user) {
+        const accessToken = context.services.auth.generateAccessToken(result.user);
+        const refreshToken = context.services.auth.generateRefreshToken(result.user);
+
+        setAccessTokenCookie(context.res, accessToken);
+        setRefreshTokenCookie(context.res, refreshToken);
+
+        logger.info("User logged in and authenticated", {
+          userId: result.user.id,
+        });
+      }
+
       return {
         success: result.success,
-        token: result.token || null,
         user: result.user || null,
         errors: result.errors,
       };
@@ -111,9 +141,7 @@ export const authResolvers = {
     /**
      * Logout current user
      *
-     * Note: With JWT, logout is client-side (delete token).
-     * This endpoint is for consistency and potential future
-     * token blacklisting implementation.
+     * Clears authentication cookies and blacklists tokens for proper logout.
      *
      * @returns true on success
      */
@@ -122,11 +150,117 @@ export const authResolvers = {
       _args: unknown,
       context: Context
     ): Promise<boolean> => {
-      logger.info("Resolver: logout", { userId: context.auth.user?.id });
+      const userId = context.auth.user?.id;
+      logger.info("Resolver: logout", { userId });
 
-      // JWT logout is handled client-side by removing the token
-      // In the future, we could implement token blacklisting here
+      // Get tokens from cookies to blacklist them
+      const accessToken = context.req.cookies?.accessToken;
+      const refreshToken = context.req.cookies?.refreshToken;
+
+      // Blacklist tokens if they exist
+      if (accessToken || refreshToken) {
+        const tokenBlacklist = context.services.tokenBlacklist;
+
+        if (accessToken) {
+          const accessTokenId = TokenBlacklistService.getTokenId(accessToken);
+          // Get expiration from token (15 minutes from now)
+          const expiresAt = Date.now() + 15 * 60 * 1000;
+          tokenBlacklist.blacklistToken(accessTokenId, expiresAt);
+        }
+
+        if (refreshToken) {
+          const refreshTokenId = TokenBlacklistService.getTokenId(refreshToken);
+          // Get expiration from token (7 days from now)
+          const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+          tokenBlacklist.blacklistToken(refreshTokenId, expiresAt);
+        }
+      }
+
+      // Clear authentication cookies
+      clearAuthCookies(context.res);
+
+      logger.info("User logged out", { userId });
       return true;
+    },
+
+    /**
+     * Refresh access token
+     *
+     * Uses refresh token from cookie to generate a new access token.
+     * Sets new access token cookie on success.
+     *
+     * @returns AuthPayload with user and errors
+     */
+    refreshToken: async (
+      _parent: unknown,
+      _args: unknown,
+      context: Context
+    ) => {
+      logger.debug("Resolver: refreshToken");
+
+      const refreshToken = context.req.cookies?.refreshToken;
+
+      if (!refreshToken) {
+        return {
+          success: false,
+          user: null,
+          errors: [
+            {
+              message: "Refresh token not found",
+              code: "REFRESH_TOKEN_MISSING",
+            },
+          ],
+        };
+      }
+
+      try {
+        // Validate refresh token
+        const payload = await context.services.auth.validateRefreshToken(
+          refreshToken
+        );
+
+        // Fetch user from database
+        const user = await context.repositories.user.findById(payload.userId);
+
+        if (!user) {
+          return {
+            success: false,
+            user: null,
+            errors: [
+              {
+                message: "User not found",
+                code: "USER_NOT_FOUND",
+              },
+            ],
+          };
+        }
+
+        // Generate new access token
+        const newAccessToken = context.services.auth.generateAccessToken(user);
+
+        // Set new access token cookie
+        setAccessTokenCookie(context.res, newAccessToken);
+
+        logger.debug("Access token refreshed", { userId: user.id });
+
+        return {
+          success: true,
+          user,
+          errors: [],
+        };
+      } catch (error) {
+        logger.warn("Refresh token validation failed", { error });
+        return {
+          success: false,
+          user: null,
+          errors: [
+            {
+              message: "Invalid or expired refresh token",
+              code: "INVALID_REFRESH_TOKEN",
+            },
+          ],
+        };
+      }
     },
   },
 

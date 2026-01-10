@@ -21,7 +21,9 @@ const envSchema = z.object({
 
   // JWT
   JWT_SECRET: z.string().min(32),
-  JWT_EXPIRES_IN: z.string().default("7d"),
+  JWT_EXPIRES_IN: z.string().default("15m"), // Access token: 15 minutes
+  JWT_REFRESH_SECRET: z.string().min(32),
+  JWT_REFRESH_EXPIRES_IN: z.string().default("7d"), // Refresh token: 7 days
 
   // SendGrid
   SENDGRID_API_KEY: z.string().optional(),
