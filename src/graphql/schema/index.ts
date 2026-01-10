@@ -79,7 +79,6 @@ const userSchema = gql`
 
   type AuthPayload {
     success: Boolean!
-    token: String
     user: User
     errors: [FieldError!]!
   }
@@ -296,6 +295,7 @@ const rootSchema = gql`
     register(input: CreateUserInput!): AuthPayload!
     login(input: LoginInput!): AuthPayload!
     logout: Boolean!
+    refreshToken: AuthPayload!
 
     # Guest User (no password required)
     createGuestUser(input: CreateGuestUserInput!): GuestUserPayload!

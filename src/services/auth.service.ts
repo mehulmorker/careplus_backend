@@ -9,6 +9,7 @@ import {
 } from "../utils/errors";
 import { logger } from "../utils/logger";
 import { env } from "../config";
+import { TokenBlacklistService } from "./token-blacklist.service";
 
 /**
  * Authentication Service Interface
@@ -17,6 +18,9 @@ export interface IAuthService {
   register(input: RegisterInput): Promise<AuthResult>;
   login(input: LoginInput): Promise<AuthResult>;
   validateToken(token: string): Promise<TokenPayload>;
+  validateRefreshToken(token: string): Promise<TokenPayload>;
+  generateAccessToken(user: User): string;
+  generateRefreshToken(user: User): string;
   hashPassword(password: string): Promise<string>;
   comparePasswords(password: string, hashedPassword: string): Promise<boolean>;
 }
@@ -41,10 +45,10 @@ export interface LoginInput {
 
 /**
  * Authentication result
+ * Note: Tokens are set in HTTP-only cookies, not returned in response
  */
 export interface AuthResult {
   success: boolean;
-  token?: string;
   user?: User;
   errors: FieldError[];
 }
@@ -97,7 +101,8 @@ export class AuthService implements IAuthService {
 
   constructor(
     private readonly userRepository: IUserRepository,
-    private readonly userService: UserService
+    private readonly userService: UserService,
+    private readonly tokenBlacklist: TokenBlacklistService
   ) {}
 
   /**
@@ -140,14 +145,10 @@ export class AuthService implements IAuthService {
 
       const user = await this.userService.create(createInput);
 
-      // Generate JWT token
-      const token = this.generateToken(user);
-
       logger.info("User registered successfully", { userId: user.id });
 
       return {
         success: true,
-        token,
         user,
         errors: [],
       };
@@ -224,33 +225,64 @@ export class AuthService implements IAuthService {
       };
     }
 
-    // Generate JWT token
-    const token = this.generateToken(user);
-
     logger.info("User logged in successfully", { userId: user.id });
 
     return {
       success: true,
-      token,
       user,
       errors: [],
     };
   }
 
   /**
-   * Validate JWT token
+   * Validate access JWT token
    *
-   * @param token - JWT token string
+   * @param token - JWT access token string
    * @returns Decoded token payload
-   * @throws AuthenticationError if token is invalid
+   * @throws AuthenticationError if token is invalid or blacklisted
    */
   async validateToken(token: string): Promise<TokenPayload> {
     try {
+      // Check if token is blacklisted
+      const tokenId = TokenBlacklistService.getTokenId(token);
+      if (this.tokenBlacklist.isTokenBlacklisted(tokenId)) {
+        logger.warn("Token validation failed: token is blacklisted", {
+          tokenId,
+        });
+        throw new AuthenticationError("Token has been invalidated");
+      }
+
       const decoded = jwt.verify(token, env.JWT_SECRET) as TokenPayload;
+
+      // Verify token hasn't expired (double check)
+      if (decoded.exp && decoded.exp * 1000 < Date.now()) {
+        throw new AuthenticationError("Token has expired");
+      }
+
       return decoded;
     } catch (error) {
-      logger.warn("Token validation failed", { error });
-      throw new AuthenticationError("Invalid or expired token");
+      if (error instanceof AuthenticationError) {
+        throw error;
+      }
+      logger.warn("Access token validation failed", { error });
+      throw new AuthenticationError("Invalid or expired access token");
+    }
+  }
+
+  /**
+   * Validate refresh JWT token
+   *
+   * @param token - JWT refresh token string
+   * @returns Decoded token payload
+   * @throws AuthenticationError if token is invalid
+   */
+  async validateRefreshToken(token: string): Promise<TokenPayload> {
+    try {
+      const decoded = jwt.verify(token, env.JWT_REFRESH_SECRET) as TokenPayload;
+      return decoded;
+    } catch (error) {
+      logger.warn("Refresh token validation failed", { error });
+      throw new AuthenticationError("Invalid or expired refresh token");
     }
   }
 
@@ -287,7 +319,8 @@ export class AuthService implements IAuthService {
   }
 
   /**
-   * Generate JWT token for a user
+   * Generate access JWT token for a user
+   * Short-lived token (15 minutes) for API requests
    *
    * Token contains:
    * - userId: For identifying the user
@@ -295,9 +328,9 @@ export class AuthService implements IAuthService {
    * - role: For authorization checks
    *
    * @param user - User entity
-   * @returns JWT token string
+   * @returns JWT access token string
    */
-  private generateToken(user: User): string {
+  generateAccessToken(user: User): string {
     const payload: TokenPayload = {
       userId: user.id,
       email: user.email,
@@ -306,6 +339,30 @@ export class AuthService implements IAuthService {
 
     return jwt.sign(payload, env.JWT_SECRET, {
       expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions["expiresIn"],
+    });
+  }
+
+  /**
+   * Generate refresh JWT token for a user
+   * Long-lived token (7 days) for obtaining new access tokens
+   *
+   * Token contains:
+   * - userId: For identifying the user
+   * - email: For display/logging
+   * - role: For authorization checks
+   *
+   * @param user - User entity
+   * @returns JWT refresh token string
+   */
+  generateRefreshToken(user: User): string {
+    const payload: TokenPayload = {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    };
+
+    return jwt.sign(payload, env.JWT_REFRESH_SECRET, {
+      expiresIn: env.JWT_REFRESH_EXPIRES_IN as jwt.SignOptions["expiresIn"],
     });
   }
 
@@ -338,12 +395,14 @@ export class AuthService implements IAuthService {
  *
  * @param userRepository - User repository instance
  * @param userService - User service instance
+ * @param tokenBlacklist - Token blacklist service instance
  * @returns AuthService instance
  */
 export const createAuthService = (
   userRepository: IUserRepository,
-  userService: UserService
+  userService: UserService,
+  tokenBlacklist: TokenBlacklistService
 ): AuthService => {
-  return new AuthService(userRepository, userService);
+  return new AuthService(userRepository, userService, tokenBlacklist);
 };
 

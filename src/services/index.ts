@@ -76,3 +76,9 @@ export {
   CloudinaryUploadResult,
   createCloudinaryService,
 } from "./cloudinary.service";
+
+// Token Blacklist Service
+export {
+  TokenBlacklistService,
+  createTokenBlacklistService,
+} from "./token-blacklist.service";
